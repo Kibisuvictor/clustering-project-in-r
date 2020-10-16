@@ -1,0 +1,105 @@
+---
+title: "game analytics"
+author: 
+date: "10/16/2020"
+output: word_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+This project is about clustering and the goal is including video game analytics as part of their sports consulting practice group. The data scraped is about the game "player unknown's Battlegrounds".
+
+## Preparation
+```{r}
+library(tidyverse)
+library(fclust)
+library(NbClust)
+library(mclust)
+library(cluster)
+library(factoextra)
+
+## load the data
+player_stats <- read_csv("BDS_WK08_PUBG_Player_Statistics-1.csv")
+player_stats %>% head()
+str(player_stats)
+
+```
+
+```{r}
+## subsetting the data
+solo_players <- player_stats %>% select(contains("solo_"))
+solo_players %>% names()
+```
+
+## Data Preparation
+```{r}
+## remove all the missing values if any
+solo_players <- na.omit(solo_players)
+## scale the data
+solo2 <- data.frame(apply(solo_players,2,scale))
+colnames(solo2) <- colnames(solo_players)
+
+
+## scaling introduced some NAs so we can remove the columns with nas
+solo2 <- solo2 %>% select(-c(solo_Revives,solo_RevivesPg,solo_WeaponAcquired,solo_DBNOs))
+
+## sample the data
+set.seed(123)
+solo3 <- solo2 %>% sample_frac(0.15, replace = FALSE)
+```
+
+
+## K-means
+```{r}
+## getting the distances
+distance <- get_dist(solo3)
+
+## kmeans
+k2 <- kmeans(solo3, centers = 2)
+k2
+```
+
+```{r}
+clusplot(solo3, k2$cluster)
+```
+
+```{r}
+## tuning the kmeans
+k3 <- kmeans(solo3, 3, nstart = 25, iter.max = 50)
+
+## plotting
+clusplot(solo3, k3$cluster)
+```
+
+
+```{r}
+fviz_cluster(k3, data = solo3)
+```
+
+
+
+ ## Summary of the results
+using 3 as our number of clusters we can perform the final analysis and extract the results using 3 clusters.
+```{r}
+## fitting the final model
+final <- kmeans(solo3, 4, nstart = 25, iter.max = 30)
+final
+```
+```{r}
+## visualizing we get
+fviz_cluster(final,data = solo3)
+```
+
+Now we can extract the clusters and add to the initial data to do some descriptve statiatcs at the cluster level.
+```{r}
+## initial datas duplicate
+set.seed(456)
+sol3_dup <- solo_players %>% sample_frac(0.15, replace = FALSE)
+
+sol3_dup %>% mutate(Cluster = final$cluster) %>% 
+  group_by(Cluster) %>% 
+  summarise_all("mean")
+```
+
+From the model we got 4 optimal clusters, and after doing some summary statistics we can say the quality was good. having a withinness of 35% that is the quality of partition, had no real interpretation as we know the higher percentage means a better partition. 
